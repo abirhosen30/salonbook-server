@@ -10,6 +10,7 @@ import {
   notFoundHandler,
   globalErrorHandler,
 } from "./middleware/error.middleware.js";
+import { sanitizeMongoInput } from "./middleware/sanitize.middleware.js";
 
 export function createApp(): Express {
   const app = express();
@@ -62,6 +63,7 @@ export function createApp(): Express {
   // 6. Normal Body Parsers for all other routes
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+  app.use(sanitizeMongoInput);
 
   // 7. Health Check
   app.get("/", (req: Request, res: Response) => {
