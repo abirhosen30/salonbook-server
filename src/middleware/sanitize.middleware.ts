@@ -1,23 +1,23 @@
 import { Request, Response, NextFunction } from "express";
 
-function cleanObject(obj: any): any {
+function cleanInPlace(obj: any): void {
   if (obj === null || typeof obj !== "object") {
-    return obj;
+    return;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(cleanObject);
+    obj.forEach(cleanInPlace);
+    return;
   }
 
-  const cleaned: Record<string, any> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    // Strip keys starting with $ or containing a dot to prevent Mongo operator injection
+  for (const key of Object.keys(obj)) {
+    // Delete keys that start with $ or contain . to prevent Mongo operator injection
     if (key.startsWith("$") || key.includes(".")) {
-      continue;
+      delete obj[key];
+    } else if (typeof obj[key] === "object") {
+      cleanInPlace(obj[key]);
     }
-    cleaned[key] = cleanObject(value);
   }
-  return cleaned;
 }
 
 export function sanitizeMongoInput(
@@ -26,13 +26,13 @@ export function sanitizeMongoInput(
   next: NextFunction
 ): void {
   if (req.body && typeof req.body === "object") {
-    req.body = cleanObject(req.body);
+    cleanInPlace(req.body);
   }
   if (req.query && typeof req.query === "object") {
-    req.query = cleanObject(req.query);
+    cleanInPlace(req.query);
   }
   if (req.params && typeof req.params === "object") {
-    req.params = cleanObject(req.params);
+    cleanInPlace(req.params);
   }
   next();
 }
