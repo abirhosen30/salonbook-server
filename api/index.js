@@ -1538,21 +1538,19 @@ async function seedInitialServicesIfNeeded() {
 // src/serverless.ts
 var app = createApp();
 var isInitialized = false;
-async function init() {
+app.use(async (req, res, next) => {
   if (!isInitialized) {
     try {
       await connectDB();
       await seedInitialServicesIfNeeded();
       isInitialized = true;
     } catch (err) {
-      console.error("\u26A0\uFE0F Failed to initialize database in serverless function:", err.message);
+      console.error("\u26A0\uFE0F Failed to initialize database in serverless function:", err?.message);
     }
   }
-}
-async function handler(req, res) {
-  await init();
-  return app(req, res);
-}
+  next();
+});
+var serverless_default = app;
 export {
-  handler as default
+  serverless_default as default
 };

@@ -5,19 +5,17 @@ import { seedInitialServicesIfNeeded } from "./utils/seed.js";
 const app = createApp();
 let isInitialized = false;
 
-async function init() {
+app.use(async (req, res, next) => {
   if (!isInitialized) {
     try {
       await connectDB();
       await seedInitialServicesIfNeeded();
       isInitialized = true;
     } catch (err: any) {
-      console.error("⚠️ Failed to initialize database in serverless function:", err.message);
+      console.error("⚠️ Failed to initialize database in serverless function:", err?.message);
     }
   }
-}
+  next();
+});
 
-export default async function handler(req: any, res: any) {
-  await init();
-  return app(req, res);
-}
+export default app;
