@@ -11,6 +11,7 @@ import {
   globalErrorHandler,
 } from "./middleware/error.middleware.js";
 import { sanitizeMongoInput } from "./middleware/sanitize.middleware.js";
+import { connectDB } from "./config/database.js";
 
 export function createApp(): Express {
   const app = express();
@@ -96,6 +97,16 @@ export function createApp(): Express {
       service: "salonbook-backend",
       uptime: process.uptime(),
     });
+  });
+
+  // Ensure database connected before handling any API routes
+  app.use(async (req: Request, res: Response, next) => {
+    try {
+      await connectDB();
+    } catch (err: any) {
+      console.warn("⚠️ Database connection check:", err.message);
+    }
+    next();
   });
 
   // 8. Mount Main API Routes
