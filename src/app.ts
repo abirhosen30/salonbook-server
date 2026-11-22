@@ -25,7 +25,22 @@ export function createApp(): Express {
   // 2. CORS setup
   app.use(
     cors({
-      origin: [ENV.CLIENT_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000"],
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server, Stripe webhooks)
+        if (!origin) return callback(null, true);
+
+        // Allow localhost or any vercel client or specified CLIENT_ORIGIN
+        if (
+          origin === "http://localhost:3000" ||
+          origin === "http://127.0.0.1:3000" ||
+          origin === ENV.CLIENT_ORIGIN ||
+          origin.endsWith(".vercel.app")
+        ) {
+          return callback(null, true);
+        }
+
+        return callback(null, true);
+      },
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "stripe-signature"],
