@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && esbuild src/serverless.ts --bundle --platform=node --target=node20 --format=esm --packages=external --outfile=api/index.js",
     "start": "node dist/server.js",
     "test": "node --import tsx --test tests/**/*.test.ts"
   },
@@ -36,6 +36,7 @@
     "@types/multer": "^2.3.0",
     "@types/node": "^26.6.6",
     "@types/supertest": "^7.2.1",
+    "esbuild": "^0.28.2",
     "supertest": "^7.3.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"

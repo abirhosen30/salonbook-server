@@ -1,6 +1,6 @@
-import { createApp } from "../src/app.js";
-import { connectDB } from "../src/config/database.js";
-import { seedInitialServicesIfNeeded } from "../src/utils/seed.js";
+import { createApp } from "./app.js";
+import { connectDB } from "./config/database.js";
+import { seedInitialServicesIfNeeded } from "./utils/seed.js";
 
 const app = createApp();
 let isInitialized = false;
@@ -11,8 +11,8 @@ async function init() {
       await connectDB();
       await seedInitialServicesIfNeeded();
       isInitialized = true;
-    } catch (err) {
-      console.error("⚠️ Failed to initialize database connection in serverless function:", err);
+    } catch (err: any) {
+      console.error("⚠️ Failed to initialize database in serverless function:", err.message);
     }
   }
 }
