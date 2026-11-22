@@ -5,7 +5,7 @@ import { authenticateJWT } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-// Allow authenticated users (customers and admins) to upload images
-router.post("/image", authenticateJWT, upload.single("image"), uploadImageHandler);
+// Allow both signup users and authenticated users to upload image files with strict MIME & size validation
+router.post("/image", upload.single("image"), uploadImageHandler);
 
 export default router;

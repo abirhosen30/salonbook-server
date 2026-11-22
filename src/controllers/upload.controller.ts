@@ -13,22 +13,29 @@ export async function uploadImageHandler(
       return;
     }
 
-    // If IMGBB_API_KEY is configured, upload to ImgBB
+    // If IMGBB_API_KEY is configured, try uploading to ImgBB
     if (ENV.IMGBB_API_KEY) {
-      const result = await uploadToImgBB(
-        req.file.buffer,
-        req.file.originalname || "salonbook-upload"
-      );
+      try {
+        const result = await uploadToImgBB(
+          req.file.buffer,
+          req.file.originalname || "salonbook-upload"
+        );
 
-      sendSuccess(
-        res,
-        {
-          url: result.url,
-          displayUrl: result.displayUrl,
-        },
-        "Image uploaded to ImgBB successfully"
-      );
-      return;
+        sendSuccess(
+          res,
+          {
+            url: result.url,
+            displayUrl: result.displayUrl,
+          },
+          "Image uploaded to ImgBB successfully"
+        );
+        return;
+      } catch (imgbbErr: any) {
+        console.warn(
+          "⚠️ ImgBB API error, using fallback data URI to prevent blocking upload:",
+          imgbbErr.message
+        );
+      }
     }
 
     // In local development if API key is not configured yet:
