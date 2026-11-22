@@ -622,8 +622,9 @@ async function createStripeCheckoutSession(params) {
       "Stripe is not initialized. Please configure STRIPE_SECRET_KEY."
     );
   }
-  const successUrl = params.successUrl || `${ENV.CLIENT_ORIGIN}/dashboard/customer/appointments?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = params.cancelUrl || `${ENV.CLIENT_ORIGIN}/dashboard/customer/appointments?payment_cancelled=true`;
+  const clientOrigin = ENV.CLIENT_ORIGIN && !ENV.CLIENT_ORIGIN.includes("localhost") ? ENV.CLIENT_ORIGIN : process.env.NODE_ENV === "production" ? "https://salonbook-client-henna.vercel.app" : ENV.CLIENT_ORIGIN || "http://localhost:3000";
+  const successUrl = params.successUrl || `${clientOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = params.cancelUrl || `${clientOrigin}/payment/cancel`;
   const sessionParams = {
     payment_method_types: ["card"],
     mode: "payment",
@@ -763,10 +764,84 @@ async function getPaymentByAppointment(req, res) {
     sendError(res, "Failed to retrieve transaction", 500);
   }
 }
+async function verifyCheckoutSession(req, res) {
+  try {
+    const { sessionId } = req.params;
+    if (!sessionId) {
+      sendError(res, "sessionId is required", 400);
+      return;
+    }
+    const stripe = getStripe();
+    if (!stripe) {
+      sendError(res, "Stripe is not configured", 500);
+      return;
+    }
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (!session) {
+      sendError(res, "Stripe session not found", 404);
+      return;
+    }
+    const appointmentId = session.metadata?.appointmentId;
+    const isPaid = session.payment_status === "paid";
+    if (isPaid && appointmentId) {
+      const transactionsCollection = getTransactionsCollection();
+      const appointmentsCollection2 = getAppointmentsCollection();
+      const existingTx = await transactionsCollection.findOne({
+        stripeSessionId: session.id
+      });
+      if (!existingTx) {
+        const txDoc = {
+          appointmentId,
+          customerId: session.metadata?.customerId || "",
+          customerName: session.metadata?.customerName || session.customer_details?.name || "Customer",
+          customerEmail: session.customer_details?.email || session.customer_email || "",
+          serviceName: session.metadata?.serviceName || "Salon Service",
+          amount: (session.amount_total || 0) / 100,
+          currency: session.currency?.toUpperCase() || "USD",
+          stripeSessionId: session.id,
+          status: "paid",
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        await transactionsCollection.insertOne(txDoc);
+        console.log(`\u2705 [Verification] Transaction created for appointment ${appointmentId}`);
+      }
+      const aptQuery2 = ObjectId4.isValid(appointmentId) ? { _id: new ObjectId4(appointmentId) } : { _id: appointmentId };
+      await appointmentsCollection2.updateOne(aptQuery2, {
+        $set: {
+          paymentStatus: "paid",
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
+      console.log(`\u2705 [Verification] Appointment ${appointmentId} updated to paid`);
+    }
+    const appointmentsCollection = getAppointmentsCollection();
+    const aptQuery = appointmentId && ObjectId4.isValid(appointmentId) ? { _id: new ObjectId4(appointmentId) } : { _id: appointmentId };
+    const appointment = appointmentId ? await appointmentsCollection.findOne(aptQuery) : null;
+    sendSuccess(
+      res,
+      {
+        isPaid,
+        sessionId: session.id,
+        amount: (session.amount_total || 0) / 100,
+        currency: session.currency?.toUpperCase() || "USD",
+        customerEmail: session.customer_details?.email || session.customer_email || "",
+        customerName: session.customer_details?.name || session.metadata?.customerName || "Customer",
+        serviceName: session.metadata?.serviceName || "Salon Service",
+        appointmentId: appointmentId || "",
+        appointment: appointment ? { ...appointment, _id: appointment._id?.toString() } : null
+      },
+      "Checkout session verified successfully"
+    );
+  } catch (error) {
+    console.error("verifyCheckoutSession error:", error);
+    sendError(res, error.message || "Failed to verify checkout session", 500);
+  }
+}
 
 // src/routes/payment.routes.ts
 var router3 = Router3();
 router3.post("/create-checkout-session", authenticateJWT, createCheckoutSession);
+router3.get("/verify/:sessionId", verifyCheckoutSession);
 router3.get("/:appointmentId", authenticateJWT, getPaymentByAppointment);
 var payment_routes_default = router3;
 

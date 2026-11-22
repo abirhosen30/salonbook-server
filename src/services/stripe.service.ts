@@ -23,12 +23,19 @@ export async function createStripeCheckoutSession(
     );
   }
 
+  const clientOrigin =
+    ENV.CLIENT_ORIGIN && !ENV.CLIENT_ORIGIN.includes("localhost")
+      ? ENV.CLIENT_ORIGIN
+      : process.env.NODE_ENV === "production"
+        ? "https://salonbook-client-henna.vercel.app"
+        : ENV.CLIENT_ORIGIN || "http://localhost:3000";
+
   const successUrl =
     params.successUrl ||
-    `${ENV.CLIENT_ORIGIN}/dashboard/customer/appointments?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
+    `${clientOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl =
     params.cancelUrl ||
-    `${ENV.CLIENT_ORIGIN}/dashboard/customer/appointments?payment_cancelled=true`;
+    `${clientOrigin}/payment/cancel`;
 
   const sessionParams: any = {
     payment_method_types: ["card"],

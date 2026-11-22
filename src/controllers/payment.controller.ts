@@ -5,8 +5,9 @@ import {
   getTransactionsCollection,
   getServicesCollection,
 } from "../config/database.js";
-import { AuthenticatedRequest } from "../types/index.js";
+import { AuthenticatedRequest, TransactionDocument } from "../types/index.js";
 import { createStripeCheckoutSession } from "../services/stripe.service.js";
+import { getStripe } from "../config/stripe.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 
 export async function createCheckoutSession(
@@ -125,5 +126,104 @@ export async function getPaymentByAppointment(
   } catch (error: any) {
     console.error("getPaymentByAppointment error:", error);
     sendError(res, "Failed to retrieve transaction", 500);
+  }
+}
+
+export async function verifyCheckoutSession(
+  req: any,
+  res: Response
+): Promise<void> {
+  try {
+    const { sessionId } = req.params;
+    if (!sessionId) {
+      sendError(res, "sessionId is required", 400);
+      return;
+    }
+
+    const stripe = getStripe();
+    if (!stripe) {
+      sendError(res, "Stripe is not configured", 500);
+      return;
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (!session) {
+      sendError(res, "Stripe session not found", 404);
+      return;
+    }
+
+    const appointmentId = session.metadata?.appointmentId;
+    const isPaid = session.payment_status === "paid";
+
+    if (isPaid && appointmentId) {
+      const transactionsCollection = getTransactionsCollection();
+      const appointmentsCollection = getAppointmentsCollection();
+
+      // Idempotently store transaction in transactions collection (PDF Page 13 & 18)
+      const existingTx = await transactionsCollection.findOne({
+        stripeSessionId: session.id,
+      });
+
+      if (!existingTx) {
+        const txDoc: TransactionDocument = {
+          appointmentId: appointmentId,
+          customerId: session.metadata?.customerId || "",
+          customerName:
+            session.metadata?.customerName ||
+            session.customer_details?.name ||
+            "Customer",
+          customerEmail: session.customer_details?.email || session.customer_email || "",
+          serviceName: session.metadata?.serviceName || "Salon Service",
+          amount: (session.amount_total || 0) / 100,
+          currency: session.currency?.toUpperCase() || "USD",
+          stripeSessionId: session.id,
+          status: "paid",
+          createdAt: new Date().toISOString(),
+        };
+        await transactionsCollection.insertOne(txDoc as any);
+        console.log(`✅ [Verification] Transaction created for appointment ${appointmentId}`);
+      }
+
+      // Update appointment status to paid (PDF Page 13 & 17)
+      const aptQuery = ObjectId.isValid(appointmentId)
+        ? { _id: new ObjectId(appointmentId) }
+        : { _id: appointmentId as any };
+
+      await appointmentsCollection.updateOne(aptQuery, {
+        $set: {
+          paymentStatus: "paid",
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      console.log(`✅ [Verification] Appointment ${appointmentId} updated to paid`);
+    }
+
+    const appointmentsCollection = getAppointmentsCollection();
+    const aptQuery =
+      appointmentId && ObjectId.isValid(appointmentId)
+        ? { _id: new ObjectId(appointmentId) }
+        : { _id: appointmentId as any };
+    const appointment = appointmentId ? await appointmentsCollection.findOne(aptQuery) : null;
+
+    sendSuccess(
+      res,
+      {
+        isPaid,
+        sessionId: session.id,
+        amount: (session.amount_total || 0) / 100,
+        currency: session.currency?.toUpperCase() || "USD",
+        customerEmail: session.customer_details?.email || session.customer_email || "",
+        customerName: session.customer_details?.name || session.metadata?.customerName || "Customer",
+        serviceName: session.metadata?.serviceName || "Salon Service",
+        appointmentId: appointmentId || "",
+        appointment: appointment
+          ? { ...appointment, _id: appointment._id?.toString() }
+          : null,
+      },
+      "Checkout session verified successfully"
+    );
+  } catch (error: any) {
+    console.error("verifyCheckoutSession error:", error);
+    sendError(res, error.message || "Failed to verify checkout session", 500);
   }
 }
