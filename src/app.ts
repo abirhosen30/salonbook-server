@@ -81,23 +81,32 @@ export function createApp(): Express {
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
   app.use(sanitizeMongoInput);
 
-  // 7. Health Check
-  app.get("/", (req: Request, res: Response) => {
+  // 7. Health Check & Root Endpoints
+  const sendRootInfo = (req: Request, res: Response) => {
     res.json({
       status: "ok",
       name: "SalonBook API",
       version: "1.0.0",
       timestamp: new Date().toISOString(),
+      message: "Welcome to the SalonBook API!",
     });
-  });
+  };
 
-  app.get("/api/v1/health", (req: Request, res: Response) => {
+  app.get("/", sendRootInfo);
+  app.get("/api", sendRootInfo);
+  app.get("/api/v1", sendRootInfo);
+
+  const sendHealthInfo = (req: Request, res: Response) => {
     res.json({
       status: "healthy",
       service: "salonbook-backend",
       uptime: process.uptime(),
     });
-  });
+  };
+
+  app.get("/health", sendHealthInfo);
+  app.get("/api/health", sendHealthInfo);
+  app.get("/api/v1/health", sendHealthInfo);
 
   // Ensure database connected before handling any API routes
   app.use(async (req: Request, res: Response, next) => {

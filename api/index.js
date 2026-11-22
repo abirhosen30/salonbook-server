@@ -1416,21 +1416,28 @@ function createApp() {
   app2.use(express.json({ limit: "10mb" }));
   app2.use(express.urlencoded({ extended: true, limit: "10mb" }));
   app2.use(sanitizeMongoInput);
-  app2.get("/", (req, res) => {
+  const sendRootInfo = (req, res) => {
     res.json({
       status: "ok",
       name: "SalonBook API",
       version: "1.0.0",
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      message: "Welcome to the SalonBook API!"
     });
-  });
-  app2.get("/api/v1/health", (req, res) => {
+  };
+  app2.get("/", sendRootInfo);
+  app2.get("/api", sendRootInfo);
+  app2.get("/api/v1", sendRootInfo);
+  const sendHealthInfo = (req, res) => {
     res.json({
       status: "healthy",
       service: "salonbook-backend",
       uptime: process.uptime()
     });
-  });
+  };
+  app2.get("/health", sendHealthInfo);
+  app2.get("/api/health", sendHealthInfo);
+  app2.get("/api/v1/health", sendHealthInfo);
   app2.use(async (req, res, next) => {
     try {
       await connectDB();
